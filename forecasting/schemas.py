@@ -6,6 +6,19 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 
+class ForecastRequest(BaseModel):
+    """
+    Request model for the internal forecast API endpoint.
+    """
+    model_config = ConfigDict(populate_by_name=True)
+
+    cargo_tonnage: float = Field(..., description="Cargo tonnage in metric tonnes (e.g. 50000)")
+    commodity: str = Field(..., description="Bulk commodity name (e.g. 'coal')")
+    origin: str = Field(..., description="Origin port or country (e.g. 'Australia')")
+    destination_port: str = Field(..., description="Destination port name (e.g. 'Paradip')")
+    required_date: str = Field(..., description="Target required date in YYYY-MM-DD format (e.g. '2026-10-15')")
+
+
 class ForecastHorizon(BaseModel):
     """
     Represents projected freight rates across multiple time horizons (7, 14, and 30 days).
