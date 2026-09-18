@@ -1,11 +1,15 @@
 """
 Internal FastAPI Service for Freight Rate Forecasting & Analytics.
 
-Exposes endpoints for health checks and freight rate forecasting & charter timing.
+Exposes endpoints for health checks and freight rate forecasting & charter timing
+with input validation and graceful error handling.
 """
 
 from datetime import datetime
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, status
+from fastapi.responses import JSONResponse
+from fastapi.exceptions import RequestValidationError
+
 from forecasting.schemas import ForecastRequest, CombinedOutput
 from forecasting.synthetic_data import generate_synthetic_rates
 from forecasting.forecasting_model import forecast_freight_rate
@@ -16,6 +20,24 @@ app = FastAPI(
     description="Internal API service providing time-series freight rate forecasts and charter timing recommendations.",
     version="1.0.0"
 )
+
+
+@app.exception_handler(RequestValidationError)
+def custom_validation_exception_handler(request, exc: RequestValidationError):
+    """
+    Format FastAPI Pydantic validation errors into clean HTTP 422 responses.
+    """
+    errors = exc.errors()
+    error_msg = errors[0].get("msg", "Invalid input parameters") if errors else "Invalid request body"
+
+    # Strip Pydantic's "Value error, " prefix if present
+    if error_msg.startswith("Value error, "):
+        error_msg = error_msg.replace("Value error, ", "")
+
+    return JSONResponse(
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        content={"detail": error_msg}
+    )
 
 
 @app.get("/internal/health", tags=["Health"])
@@ -31,8 +53,8 @@ def get_forecast(request: ForecastRequest):
     """
     Generates time-series freight rate forecast and charter timing recommendation.
     """
+    # Core execution wrapped in try/except for 500 safety
     try:
-        # Use current date as historical baseline start date for synthetic data generation
         start_date = datetime.now().strftime("%Y-%m-%d")
 
         # Generate synthetic historical rate data standing in for DB pipeline
@@ -68,7 +90,13 @@ def get_forecast(request: ForecastRequest):
         )
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to generate forecast: {str(e)}")
+        return JSONResponse(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            content={
+                "error": "Internal forecasting error",
+                "detail": str(e)
+            }
+        )
 
 
 # Run with: uvicorn forecasting.api:app --reload --port 8001

@@ -1,9 +1,11 @@
 """
 Pydantic schemas matching the exact API contract for Forecasting & Analytics.
+Includes field validators for strict input sanitization.
 """
 
+from datetime import datetime
 from typing import Literal
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class ForecastRequest(BaseModel):
@@ -17,6 +19,31 @@ class ForecastRequest(BaseModel):
     origin: str = Field(..., description="Origin port or country (e.g. 'Australia')")
     destination_port: str = Field(..., description="Destination port name (e.g. 'Paradip')")
     required_date: str = Field(..., description="Target required date in YYYY-MM-DD format (e.g. '2026-10-15')")
+
+    @field_validator("cargo_tonnage")
+    @classmethod
+    def validate_cargo_tonnage(cls, value: float) -> float:
+        if value is None or value <= 0:
+            raise ValueError("cargo_tonnage must be a positive number")
+        return value
+
+    @field_validator("commodity", "origin", "destination_port")
+    @classmethod
+    def validate_non_empty_string(cls, value: str, info) -> str:
+        if not value or not str(value).strip():
+            raise ValueError(f"{info.field_name} must not be empty")
+        return value.strip()
+
+    @field_validator("required_date")
+    @classmethod
+    def validate_required_date(cls, value: str) -> str:
+        if not value or not str(value).strip():
+            raise ValueError("required_date must not be empty")
+        try:
+            datetime.strptime(value.strip(), "%Y-%m-%d")
+        except ValueError:
+            raise ValueError("invalid required_date format, expected YYYY-MM-DD")
+        return value.strip()
 
 
 class ForecastHorizon(BaseModel):
