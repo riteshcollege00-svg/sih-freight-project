@@ -1,0 +1,8 @@
+# Core Database & Environment Dependencies for Member 1 - Data & Domain Foundation
+psycopg[binary]>=3.1.0
+python-dotenv>=1.0.0
+
+# Optional Data Science / ORM tools (useful for downstream consumers)
+pandas>=2.0.0
+sqlalchemy>=2.0.0
+pytest>=8.0.0
