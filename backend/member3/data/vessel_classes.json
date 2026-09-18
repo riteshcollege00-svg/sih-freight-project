@@ -1,0 +1,30 @@
+[
+  {
+    "class": "Handysize",
+    "draft_m": 10.0,
+    "loa_m": 180.0,
+    "beam_m": 28.0,
+    "dwt_tonnes": 35000.0
+  },
+  {
+    "class": "Supramax",
+    "draft_m": 12.8,
+    "loa_m": 199.9,
+    "beam_m": 32.26,
+    "dwt_tonnes": 58000.0
+  },
+  {
+    "class": "Panamax",
+    "draft_m": 14.2,
+    "loa_m": 225.0,
+    "beam_m": 32.26,
+    "dwt_tonnes": 75000.0
+  },
+  {
+    "class": "Capesize",
+    "draft_m": 18.2,
+    "loa_m": 292.0,
+    "beam_m": 45.0,
+    "dwt_tonnes": 180000.0
+  }
+]

@@ -1,0 +1,23 @@
+{
+  "Paradip": {
+    "port_dues_usd": 40000.0
+  },
+  "Visakhapatnam": {
+    "port_dues_usd": 45000.0
+  },
+  "Gangavaram": {
+    "port_dues_usd": 42000.0
+  },
+  "Gopalpur": {
+    "port_dues_usd": 35000.0
+  },
+  "Dhamra": {
+    "port_dues_usd": 43000.0
+  },
+  "Sagar": {
+    "port_dues_usd": 20000.0
+  },
+  "Haldia": {
+    "port_dues_usd": 38000.0
+  }
+}

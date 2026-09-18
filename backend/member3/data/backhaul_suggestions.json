@@ -1,0 +1,30 @@
+{
+  "Paradip": {
+    "nearest_origin": "Indonesia",
+    "reason": "Short ballast distance across Bay of Bengal to Indonesian coal loading ports"
+  },
+  "Visakhapatnam": {
+    "nearest_origin": "Indonesia",
+    "reason": "Direct sea corridor to major Indonesian coal export terminals"
+  },
+  "Gangavaram": {
+    "nearest_origin": "Australia",
+    "reason": "Major Capesize trade corridor returning to Australian bulk terminals"
+  },
+  "Gopalpur": {
+    "nearest_origin": "Indonesia",
+    "reason": "Proximity to Southeast Asian bulk trade lanes via Malacca Strait"
+  },
+  "Dhamra": {
+    "nearest_origin": "Indonesia",
+    "reason": "Fast turnaround ballast leg to Sumatra/Kalimantan loading ports"
+  },
+  "Sagar": {
+    "nearest_origin": "Indonesia",
+    "reason": "Convenient exit from northern Bay of Bengal to Indonesian archipelago"
+  },
+  "Haldia": {
+    "nearest_origin": "Indonesia",
+    "reason": "Direct southern sailing route to Indonesian coal loading terminals"
+  }
+}

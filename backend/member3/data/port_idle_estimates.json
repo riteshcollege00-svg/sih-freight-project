@@ -1,0 +1,23 @@
+{
+  "Paradip": {
+    "avg_idle_days_per_voyage": 2.5
+  },
+  "Visakhapatnam": {
+    "avg_idle_days_per_voyage": 2.0
+  },
+  "Gangavaram": {
+    "avg_idle_days_per_voyage": 1.8
+  },
+  "Gopalpur": {
+    "avg_idle_days_per_voyage": 2.2
+  },
+  "Dhamra": {
+    "avg_idle_days_per_voyage": 1.9
+  },
+  "Sagar": {
+    "avg_idle_days_per_voyage": 3.2
+  },
+  "Haldia": {
+    "avg_idle_days_per_voyage": 3.8
+  }
+}

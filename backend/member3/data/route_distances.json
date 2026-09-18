@@ -1,0 +1,48 @@
+{
+  "note": "approximate great-circle estimate",
+  "Australia": {
+    "Paradip": 4200,
+    "Visakhapatnam": 4150,
+    "Gangavaram": 4140,
+    "Gopalpur": 4170,
+    "Dhamra": 4220,
+    "Sagar": 4250,
+    "Haldia": 4280
+  },
+  "USA": {
+    "Paradip": 11500,
+    "Visakhapatnam": 11450,
+    "Gangavaram": 11440,
+    "Gopalpur": 11470,
+    "Dhamra": 11520,
+    "Sagar": 11550,
+    "Haldia": 11580
+  },
+  "Mozambique": {
+    "Paradip": 3800,
+    "Visakhapatnam": 3700,
+    "Gangavaram": 3690,
+    "Gopalpur": 3750,
+    "Dhamra": 3820,
+    "Sagar": 3850,
+    "Haldia": 3880
+  },
+  "Indonesia": {
+    "Paradip": 1600,
+    "Visakhapatnam": 1500,
+    "Gangavaram": 1490,
+    "Gopalpur": 1550,
+    "Dhamra": 1620,
+    "Sagar": 1650,
+    "Haldia": 1680
+  },
+  "Russia": {
+    "Paradip": 5500,
+    "Visakhapatnam": 5550,
+    "Gangavaram": 5560,
+    "Gopalpur": 5530,
+    "Dhamra": 5480,
+    "Sagar": 5450,
+    "Haldia": 5420
+  }
+}

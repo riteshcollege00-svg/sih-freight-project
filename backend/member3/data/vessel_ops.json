@@ -1,0 +1,22 @@
+{
+  "Handysize": {
+    "speed_knots": 13.0,
+    "fuel_consumption_tonnes_per_day": 22.0,
+    "daily_hire_cost_usd": 10000.0
+  },
+  "Supramax": {
+    "speed_knots": 13.5,
+    "fuel_consumption_tonnes_per_day": 28.0,
+    "daily_hire_cost_usd": 14000.0
+  },
+  "Panamax": {
+    "speed_knots": 14.0,
+    "fuel_consumption_tonnes_per_day": 35.0,
+    "daily_hire_cost_usd": 18000.0
+  },
+  "Capesize": {
+    "speed_knots": 14.0,
+    "fuel_consumption_tonnes_per_day": 50.0,
+    "daily_hire_cost_usd": 25000.0
+  }
+}

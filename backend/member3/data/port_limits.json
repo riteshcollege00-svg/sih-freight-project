@@ -1,0 +1,37 @@
+{
+  "Paradip": {
+    "max_draft_m": 17.0,
+    "max_loa_m": 300.0,
+    "max_beam_m": 48.0
+  },
+  "Visakhapatnam": {
+    "max_draft_m": 14.5,
+    "max_loa_m": 230.0,
+    "max_beam_m": 32.5
+  },
+  "Gangavaram": {
+    "max_draft_m": 19.0,
+    "max_loa_m": 320.0,
+    "max_beam_m": 50.0
+  },
+  "Gopalpur": {
+    "max_draft_m": 13.0,
+    "max_loa_m": 200.0,
+    "max_beam_m": 32.5
+  },
+  "Dhamra": {
+    "max_draft_m": 18.0,
+    "max_loa_m": 300.0,
+    "max_beam_m": 48.0
+  },
+  "Sagar": {
+    "max_draft_m": 10.5,
+    "max_loa_m": 185.0,
+    "max_beam_m": 28.5
+  },
+  "Haldia": {
+    "max_draft_m": 8.5,
+    "max_loa_m": 190.0,
+    "max_beam_m": 32.2
+  }
+}
