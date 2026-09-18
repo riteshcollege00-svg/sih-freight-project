@@ -83,6 +83,13 @@ def analyze_vessel_optimization(
             "idle_management": {...}       # output of estimate_idle_time
         }
     """
+    if num_voyages < 1:
+        raise ValueError("num_voyages must be at least 1")
+    if cargo_tonnage <= 0:
+        raise ValueError("cargo_tonnage must be positive")
+    if not destination_port or not origin:
+        raise ValueError("destination_port and origin are required")
+
     # Step 1: Vessel-port feasibility check
     vessel_feasibility = check_feasibility(
         cargo_tonnage=cargo_tonnage,
@@ -104,6 +111,7 @@ def analyze_vessel_optimization(
             vessel_class=selected_vessel_class,
             freight_rate_usd_per_tonne=freight_rate_usd_per_tonne,
             waiting_days=0,
+            num_voyages=num_voyages,
         )
     else:
         voyage_cost = None

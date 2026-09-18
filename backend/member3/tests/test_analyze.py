@@ -115,6 +115,31 @@ class TestAnalyzeVesselOptimization(unittest.TestCase):
         extra_keys = set(result.keys()) - EXPECTED_TOP_LEVEL_KEYS
         self.assertEqual(extra_keys, set(), f"Unexpected extra keys: {extra_keys}")
 
+    def test_invalid_num_voyages(self):
+        """Test num_voyages=0 raises ValueError."""
+        with self.assertRaises(ValueError):
+            analyze_vessel_optimization(
+                cargo_tonnage=50000.0,
+                commodity="iron_ore",
+                origin="Australia",
+                destination_port="Gangavaram",
+                required_date="2026-11-15",
+                num_voyages=0,
+                freight_rate_usd_per_tonne=12.0,
+            )
+
+    def test_empty_origin(self):
+        """Test empty string origin raises ValueError."""
+        with self.assertRaises(ValueError):
+            analyze_vessel_optimization(
+                cargo_tonnage=50000.0,
+                commodity="iron_ore",
+                origin="",
+                destination_port="Gangavaram",
+                required_date="2026-11-15",
+                num_voyages=1,
+                freight_rate_usd_per_tonne=12.0,
+            )
 
 if __name__ == "__main__":
     unittest.main()

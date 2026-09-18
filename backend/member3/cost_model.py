@@ -24,11 +24,17 @@ def estimate_voyage_cost(
     destination_port: str,
     vessel_class: str,
     freight_rate_usd_per_tonne: float,
-    waiting_days: float = 0
+    waiting_days: float = 0,
+    num_voyages: int = 1
 ) -> Dict[str, Any]:
     """
     Estimate the total voyage cost and breakdown based on reference data.
     """
+    if num_voyages < 1:
+        raise ValueError("num_voyages must be at least 1")
+    if cargo_tonnage <= 0:
+        raise ValueError("cargo_tonnage must be positive")
+
     routes = _load_json("route_distances.json")
     vessels = _load_json("vessel_ops.json")
     ports = _load_json("port_costs.json")
@@ -76,11 +82,11 @@ def estimate_voyage_cost(
     total_usd = freight_rounded + fuel_rounded + port_rounded + waiting_rounded
 
     return {
-        "total_usd": total_usd,
+        "total_usd": total_usd * num_voyages,
         "breakdown": {
-            "freight": freight_rounded,
-            "fuel": fuel_rounded,
-            "port": port_rounded,
-            "waiting": waiting_rounded
+            "freight": freight_rounded * num_voyages,
+            "fuel": fuel_rounded * num_voyages,
+            "port": port_rounded * num_voyages,
+            "waiting": waiting_rounded * num_voyages
         }
     }

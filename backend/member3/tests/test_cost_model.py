@@ -66,5 +66,52 @@ class TestCostModel(unittest.TestCase):
         with self.assertRaises(ValueError):
             estimate_voyage_cost(10000, "Australia", "Paradip", "UnknownClass", 10.0)
 
+    def test_multi_voyage_scaling(self):
+        """Test num_voyages=3 gives exactly 3x the total_usd of num_voyages=1."""
+        base_result = estimate_voyage_cost(
+            cargo_tonnage=50000.0,
+            origin="Australia",
+            destination_port="Paradip",
+            vessel_class="Panamax",
+            freight_rate_usd_per_tonne=15.0,
+            waiting_days=2,
+            num_voyages=1
+        )
+        scaled_result = estimate_voyage_cost(
+            cargo_tonnage=50000.0,
+            origin="Australia",
+            destination_port="Paradip",
+            vessel_class="Panamax",
+            freight_rate_usd_per_tonne=15.0,
+            waiting_days=2,
+            num_voyages=3
+        )
+        self.assertEqual(scaled_result["total_usd"], base_result["total_usd"] * 3)
+        for key, val in base_result["breakdown"].items():
+            self.assertEqual(scaled_result["breakdown"][key], val * 3)
+
+    def test_invalid_num_voyages(self):
+        """Test num_voyages=0 raises ValueError."""
+        with self.assertRaises(ValueError):
+            estimate_voyage_cost(
+                cargo_tonnage=50000.0,
+                origin="Australia",
+                destination_port="Paradip",
+                vessel_class="Panamax",
+                freight_rate_usd_per_tonne=15.0,
+                num_voyages=0
+            )
+
+    def test_invalid_cargo_tonnage(self):
+        """Test cargo_tonnage=-100 raises ValueError."""
+        with self.assertRaises(ValueError):
+            estimate_voyage_cost(
+                cargo_tonnage=-100.0,
+                origin="Australia",
+                destination_port="Paradip",
+                vessel_class="Panamax",
+                freight_rate_usd_per_tonne=15.0
+            )
+
 if __name__ == "__main__":
     unittest.main()
