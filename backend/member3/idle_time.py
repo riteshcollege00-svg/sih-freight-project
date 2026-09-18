@@ -1,28 +1,45 @@
 """
 Idle-time and alternative-employment estimation module.
 Estimates vessel waiting times at destination ports and suggests backhaul employment options.
+
+Data source:
+- avg_turnaround_days: real database via data.db (Member 1's data layer).
+- backhaul_suggestions: local backhaul_suggestions.json (no DB equivalent in schema).
 """
 
+import sys
 from pathlib import Path
 import json
 from typing import Any, Dict, Optional, Union
 
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from data.db import db
+
 DATA_DIR = Path(__file__).resolve().parent / "data"
-DEFAULT_PORT_IDLE_FILE = DATA_DIR / "port_idle_estimates.json"
 DEFAULT_BACKHAUL_FILE = DATA_DIR / "backhaul_suggestions.json"
 
 
-def _load_json(filepath: Path) -> Dict[str, Any]:
-    with open(filepath, "r", encoding="utf-8") as f:
+def _load_backhaul(filepath: Optional[Union[str, Path]] = None) -> Dict[str, Any]:
+    path = Path(filepath) if filepath else DEFAULT_BACKHAUL_FILE
+    with open(path, "r", encoding="utf-8") as f:
         return json.load(f)
 
 
-def _find_case_insensitive_key(data: Dict[str, Any], key: str) -> Optional[str]:
-    normalized = key.strip().lower()
-    for k in data.keys():
-        if k.strip().lower() == normalized:
-            return k
-    return None
+def _get_avg_turnaround(destination_port: str) -> tuple:
+    """Fetch avg_turnaround_days for a port by name (case-insensitive) from the DB."""
+    rows = db.fetch_all("SELECT port_name, avg_turnaround_days FROM ports")
+    normalized = destination_port.strip().lower()
+    for row in rows:
+        if row[0].strip().lower() == normalized:
+            return row[0], float(row[1])
+    available = [row[0] for row in rows]
+    raise ValueError(
+        f"Destination port '{destination_port}' not found in ports table. "
+        f"Available ports: {available}"
+    )
 
 
 def estimate_idle_time(
@@ -37,7 +54,7 @@ def estimate_idle_time(
     Args:
         destination_port: Name of the destination port.
         num_voyages: Number of voyages planned.
-        port_idle_path: Optional custom path to port_idle_estimates.json.
+        port_idle_path: Deprecated (accepted for backward compat, ignored — DB used).
         backhaul_path: Optional custom path to backhaul_suggestions.json.
 
     Returns:
@@ -48,32 +65,25 @@ def estimate_idle_time(
         }
 
     Raises:
-        ValueError: If destination_port is not found in the reference data.
+        ValueError: If destination_port is not found in the database.
     """
-    idle_file = Path(port_idle_path) if port_idle_path else DEFAULT_PORT_IDLE_FILE
-    backhaul_file = Path(backhaul_path) if backhaul_path else DEFAULT_BACKHAUL_FILE
+    # avg_turnaround_days from real database
+    port_name_db, avg_turnaround = _get_avg_turnaround(destination_port)
+    expected_idle_days = round(avg_turnaround * num_voyages, 1)
 
-    idle_data = _load_json(idle_file)
-    backhaul_data = _load_json(backhaul_file)
+    # Backhaul suggestions remain from local JSON (no DB equivalent)
+    backhaul_data = _load_backhaul(backhaul_path)
+    normalized = destination_port.strip().lower()
+    backhaul_key = next(
+        (k for k in backhaul_data.keys() if k.strip().lower() == normalized), None
+    )
 
-    idle_key = _find_case_insensitive_key(idle_data, destination_port)
-    if not idle_key:
-        raise ValueError(
-            f"Destination port '{destination_port}' not found in port idle estimates. "
-            f"Available ports: {list(idle_data.keys())}"
-        )
-
-    avg_idle = idle_data[idle_key]["avg_idle_days_per_voyage"]
-    expected_idle_days = round(avg_idle * num_voyages, 1)
-
-    backhaul_key = _find_case_insensitive_key(backhaul_data, destination_port)
     if not backhaul_key:
-        raise ValueError(
-            f"Destination port '{destination_port}' not found in backhaul suggestions."
-        )
-
-    backhaul_origin = backhaul_data[backhaul_key]["nearest_origin"]
-    alternative_employment = f"backhaul option on {backhaul_origin} route"
+        # Fallback: no suggestion available
+        alternative_employment = "no backhaul suggestion available"
+    else:
+        backhaul_origin = backhaul_data[backhaul_key]["nearest_origin"]
+        alternative_employment = f"backhaul option on {backhaul_origin} route"
 
     return {
         "expected_idle_days": expected_idle_days,

@@ -1,15 +1,19 @@
 """
 Feasibility module for vessel-port compatibility.
 Evaluates whether vessel classes satisfy port dimensions and cargo requirements.
+
+Data source: real database via data.db (Member 1's data layer).
 """
 
+import sys
 from pathlib import Path
-import json
 from typing import Any, Dict, List, Optional, Union
 
-DATA_DIR = Path(__file__).resolve().parent / "data"
-DEFAULT_VESSEL_CLASSES_FILE = DATA_DIR / "vessel_classes.json"
-DEFAULT_PORT_LIMITS_FILE = DATA_DIR / "port_limits.json"
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from data.db import db
 
 
 def _format_dim(val: Union[int, float]) -> str:
@@ -22,60 +26,76 @@ def _format_tonnage(val: Union[int, float]) -> str:
     return f"{val}t"
 
 
-def load_vessel_classes(filepath: Optional[Union[str, Path]] = None) -> List[Dict[str, Any]]:
-    """Load vessel class definitions from JSON file."""
-    path = Path(filepath) if filepath else DEFAULT_VESSEL_CLASSES_FILE
-    with open(path, "r", encoding="utf-8") as f:
-        return json.load(f)
+def _load_vessels() -> List[Dict[str, Any]]:
+    """Fetch vessel class specifications from the database."""
+    rows = db.fetch_all(
+        "SELECT vessel_class, dwt, cargo_capacity_mt, loa_m, beam_m, draft_m FROM vessels"
+    )
+    return [
+        {
+            "class": row[0],
+            "dwt": float(row[1]),
+            "cargo_capacity_mt": float(row[2]),
+            "loa_m": float(row[3]),
+            "beam_m": float(row[4]),
+            "draft_m": float(row[5]),
+        }
+        for row in rows
+    ]
 
 
-def load_port_limits(filepath: Optional[Union[str, Path]] = None) -> Dict[str, Dict[str, Any]]:
-    """Load port limits from JSON file."""
-    path = Path(filepath) if filepath else DEFAULT_PORT_LIMITS_FILE
-    with open(path, "r", encoding="utf-8") as f:
-        data = json.load(f)
-    if isinstance(data, list):
-        return {item["port"]: item for item in data}
-    return data
+def _load_port(destination_port: str) -> Optional[Dict[str, Any]]:
+    """Fetch port physical limits from the database (case-insensitive name match)."""
+    rows = db.fetch_all(
+        "SELECT port_id, port_name, max_draft_m, max_loa_m, max_beam_m FROM ports"
+    )
+    normalized = destination_port.strip().lower()
+    for row in rows:
+        if row[1].strip().lower() == normalized:
+            return {
+                "port_id": row[0],
+                "port_name": row[1],
+                "max_draft_m": float(row[2]),
+                "max_loa_m": float(row[3]),
+                "max_beam_m": float(row[4]),
+            }
+    return None
 
 
-def check_feasibility(
-    cargo_tonnage: float,
-    destination_port: str,
-    vessel_classes_path: Optional[Union[str, Path]] = None,
-    port_limits_path: Optional[Union[str, Path]] = None,
-) -> Dict[str, List[Dict[str, str]]]:
+def load_vessel_classes(filepath=None) -> List[Dict[str, Any]]:
+    """Load vessel class definitions from the database.
+
+    The filepath parameter is accepted for backward compatibility but ignored —
+    data is always fetched from the real database.
     """
-    Check vessel-port compatibility based on physical port constraints and cargo tonnage.
+    return _load_vessels()
+
+
+def check_feasibility(cargo_tonnage: float, destination_port: str, **kwargs) -> Dict[str, List[Dict[str, str]]]:
+    """
+    Check vessel-port compatibility based on port physical constraints and cargo tonnage.
 
     Args:
-        cargo_tonnage: Required cargo tonnage to be transported.
+        cargo_tonnage: Required cargo weight in tonnes.
         destination_port: Name of the destination port.
-        vessel_classes_path: Optional custom path to vessel_classes.json.
-        port_limits_path: Optional custom path to port_limits.json.
 
     Returns:
-        Dict with exact shape:
+        Dict matching exact shape:
         {
             "feasible": [{"class": ..., "notes": "meets all port limits"}],
             "infeasible": [{"class": ..., "reason": ...}]
         }
     """
-    vessels = load_vessel_classes(vessel_classes_path)
-    ports = load_port_limits(port_limits_path)
-
-    port_data = ports.get(destination_port)
-    if not port_data:
-        normalized_name = destination_port.strip().lower()
-        for p_name, p_limits in ports.items():
-            if p_name.strip().lower() == normalized_name:
-                port_data = p_limits
-                break
+    vessels = _load_vessels()
+    port_data = _load_port(destination_port)
 
     if not port_data:
+        available = [
+            row[0] for row in db.fetch_all("SELECT port_name FROM ports")
+        ]
         raise ValueError(
-            f"Destination port '{destination_port}' not found in port limits reference data. "
-            f"Available ports: {list(ports.keys())}"
+            f"Destination port '{destination_port}' not found in ports table. "
+            f"Available ports: {available}"
         )
 
     max_draft = port_data["max_draft_m"]
@@ -86,11 +106,11 @@ def check_feasibility(
     infeasible: List[Dict[str, str]] = []
 
     for vessel in vessels:
-        vessel_class = vessel.get("class", vessel.get("name", "Unknown"))
+        vessel_class = vessel["class"]
         draft = vessel["draft_m"]
         loa = vessel["loa_m"]
         beam = vessel["beam_m"]
-        dwt = vessel["dwt_tonnes"]
+        capacity = vessel["cargo_capacity_mt"]
 
         reasons = []
 
@@ -100,23 +120,17 @@ def check_feasibility(
             reasons.append(f"exceeds max LOA ({_format_dim(loa)} > {_format_dim(max_loa)})")
         if beam > max_beam:
             reasons.append(f"exceeds max beam ({_format_dim(beam)} > {_format_dim(max_beam)})")
-        if cargo_tonnage > dwt:
+        if cargo_tonnage > capacity:
             reasons.append(
-                f"cargo exceeds deadweight capacity ({_format_tonnage(cargo_tonnage)} > {_format_tonnage(dwt)})"
+                f"cargo exceeds cargo capacity ({_format_tonnage(cargo_tonnage)} > {_format_tonnage(capacity)})"
             )
 
         if reasons:
-            infeasible.append({
-                "class": vessel_class,
-                "reason": ", ".join(reasons)
-            })
+            infeasible.append({"class": vessel_class, "reason": ", ".join(reasons)})
         else:
-            feasible.append({
-                "class": vessel_class,
-                "notes": "meets all port limits"
-            })
+            feasible.append({"class": vessel_class, "notes": "meets all port limits"})
 
     return {
         "feasible": feasible,
-        "infeasible": infeasible
+        "infeasible": infeasible,
     }

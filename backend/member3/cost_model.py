@@ -1,21 +1,48 @@
 """
 Voyage cost estimation model.
 Calculates costs and returns a detailed breakdown.
+
+Data source: real database via data.db (Member 1's data layer).
+Bunker price is fetched live from market_data; 650 USD/t is used only as an
+emergency fallback if market_data is empty (edge case / demo safeguard).
 """
 
-import json
+import sys
 from pathlib import Path
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
-DATA_DIR = Path(__file__).resolve().parent / "data"
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 
+from data.db import db
+
+# Fallback constant — only used when market_data table is empty
 BUNKER_PRICE_USD_PER_TONNE = 650
 
 
-def _load_json(filename: str) -> dict:
-    path = DATA_DIR / filename
-    with open(path, "r", encoding="utf-8") as f:
-        return json.load(f)
+def _get_port_id(destination_port: str) -> str:
+    """Resolve destination port name (case-insensitive) to port_id from the DB."""
+    rows = db.fetch_all("SELECT port_id, port_name, demurrage_rate_usd_day FROM ports")
+    normalized = destination_port.strip().lower()
+    for row in rows:
+        if row[1].strip().lower() == normalized:
+            return row[0], float(row[2])
+    available = [row[1] for row in rows]
+    raise ValueError(
+        f"Destination port '{destination_port}' not found in ports table. "
+        f"Available ports: {available}"
+    )
+
+
+def _get_live_bunker_price() -> float:
+    """Fetch the most recent bunker price from market_data, falling back to constant."""
+    row = db.fetch_one(
+        "SELECT bunker_price_vlsfo_usd_per_t FROM market_data ORDER BY market_date DESC LIMIT 1"
+    )
+    if row and row[0]:
+        return float(row[0])
+    return float(BUNKER_PRICE_USD_PER_TONNE)
 
 
 def estimate_voyage_cost(
@@ -25,55 +52,76 @@ def estimate_voyage_cost(
     vessel_class: str,
     freight_rate_usd_per_tonne: float,
     waiting_days: float = 0,
-    num_voyages: int = 1
+    num_voyages: int = 1,
 ) -> Dict[str, Any]:
     """
-    Estimate the total voyage cost and breakdown based on reference data.
+    Estimate the total voyage cost and breakdown based on real database data.
+
+    Args:
+        cargo_tonnage: Cargo weight in tonnes.
+        origin: Origin country (e.g. "Australia", "USA").
+        destination_port: Destination port name (e.g. "Paradip").
+        vessel_class: Vessel class name (e.g. "Panamax").
+        freight_rate_usd_per_tonne: Freight rate in USD/tonne.
+        waiting_days: Additional waiting/demurrage days per voyage (default 0).
+        num_voyages: Number of voyages; scales all costs linearly (default 1).
     """
     if num_voyages < 1:
         raise ValueError("num_voyages must be at least 1")
     if cargo_tonnage <= 0:
         raise ValueError("cargo_tonnage must be positive")
 
-    routes = _load_json("route_distances.json")
-    vessels = _load_json("vessel_ops.json")
-    ports = _load_json("port_costs.json")
+    # Resolve port_id and port dues from ports table
+    port_id, demurrage_rate = _get_port_id(destination_port)
 
-    # Validate origin and get distances
-    # Handle case insensitivity where possible for robust API
-    origin_key = next((k for k in routes.keys() if k.lower() == origin.lower() and k != "note"), None)
-    if not origin_key:
-        raise ValueError(f"Origin '{origin}' not found in route distances.")
-    
-    port_distances = routes[origin_key]
-    dest_key_dist = next((k for k in port_distances.keys() if k.lower() == destination_port.lower()), None)
-    if not dest_key_dist:
-        raise ValueError(f"Destination port '{destination_port}' not found for origin '{origin}'.")
-    distance_nm = port_distances[dest_key_dist]
+    # Look up route: origin_country + destination_port_id
+    route_row = db.fetch_one(
+        "SELECT distance_nm, bunker_consumption_factor FROM routes "
+        "WHERE origin_country = ? AND destination_port_id = ?",
+        (origin, port_id),
+    )
+    if not route_row:
+        raise ValueError(
+            f"No route found for origin '{origin}' → destination '{destination_port}' (port_id={port_id})."
+        )
+    distance_nm = float(route_row[0])
+    bunker_consumption_factor = float(route_row[1])
 
-    # Validate vessel class
-    vessel_key = next((k for k in vessels.keys() if k.lower() == vessel_class.lower()), None)
-    if not vessel_key:
-        raise ValueError(f"Vessel class '{vessel_class}' not found in vessel ops.")
-    vessel_data = vessels[vessel_key]
-    speed_knots = vessel_data["speed_knots"]
-    fuel_consumption = vessel_data["fuel_consumption_tonnes_per_day"]
-    daily_hire = vessel_data["daily_hire_cost_usd"]
+    # Look up vessel operating profile
+    vessel_row = db.fetch_one(
+        "SELECT service_speed_knots, fuel_consumption_tpd FROM vessels WHERE vessel_class = ?",
+        (vessel_class,),
+    )
+    if not vessel_row:
+        rows = db.fetch_all("SELECT vessel_class FROM vessels")
+        available = [r[0] for r in rows]
+        raise ValueError(
+            f"Vessel class '{vessel_class}' not found in vessels table. "
+            f"Available: {available}"
+        )
+    speed_knots = float(vessel_row[0])
+    fuel_consumption_tpd = float(vessel_row[1])
 
-    # Validate port costs
-    port_key = next((k for k in ports.keys() if k.lower() == destination_port.lower()), None)
-    if not port_key:
-        raise ValueError(f"Destination port '{destination_port}' not found in port costs.")
-    port_dues_usd = ports[port_key]["port_dues_usd"]
+    # Live bunker price (fallback to constant if market_data empty)
+    bunker_price = _get_live_bunker_price()
+
+    # Port cost estimate: one day of demurrage rate as a simplified port-call cost.
+    # This is a hackathon-scope simplification; real tariffs are multi-tiered.
+    port_due_usd = demurrage_rate * 1.0
+
+    # Waiting cost: per-voyage waiting days at the vessel's daily hire equivalent,
+    # approximated as demurrage_rate (closest available daily cost figure in schema)
+    daily_hire_usd = demurrage_rate
 
     # Calculations
     freight = cargo_tonnage * freight_rate_usd_per_tonne
     voyage_days = distance_nm / (speed_knots * 24)
-    fuel = voyage_days * fuel_consumption * BUNKER_PRICE_USD_PER_TONNE
-    port = port_dues_usd
-    waiting = waiting_days * daily_hire
+    # Apply route-specific bunker consumption factor
+    fuel = voyage_days * fuel_consumption_tpd * bunker_consumption_factor * bunker_price
+    port = port_due_usd
+    waiting = waiting_days * daily_hire_usd
 
-    # Round to nearest whole number
+    # Round each component first, then sum — this guarantees total == sum(breakdown)
     freight_rounded = round(freight)
     fuel_rounded = round(fuel)
     port_rounded = round(port)
@@ -87,6 +135,6 @@ def estimate_voyage_cost(
             "freight": freight_rounded * num_voyages,
             "fuel": fuel_rounded * num_voyages,
             "port": port_rounded * num_voyages,
-            "waiting": waiting_rounded * num_voyages
-        }
+            "waiting": waiting_rounded * num_voyages,
+        },
     }

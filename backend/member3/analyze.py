@@ -21,19 +21,19 @@ def _find_most_efficient_vessel(
 ) -> Optional[str]:
     """
     From the list of feasible vessel dicts (each has "class" key),
-    select the vessel class whose dwt_tonnes is closest to cargo_tonnage.
-    Since all feasible vessels already have dwt >= cargo_tonnage, this
-    picks the most size-efficient (smallest excess capacity) option.
+    select the vessel class whose cargo_capacity_mt is closest to cargo_tonnage.
+    Since all feasible vessels already have cargo_capacity_mt >= cargo_tonnage
+    (by feasibility.py's check), this picks the most size-efficient option.
 
     Returns the vessel class name string, or None if the list is empty.
     """
     if not feasible_vessels:
         return None
 
-    # Load vessel classes to compare dwt_tonnes values
+    # Load vessel classes from DB to compare cargo_capacity_mt values
     vessel_classes = load_vessel_classes()
-    dwt_lookup: Dict[str, float] = {
-        v["class"]: v["dwt_tonnes"] for v in vessel_classes
+    capacity_lookup: Dict[str, float] = {
+        v["class"]: v["cargo_capacity_mt"] for v in vessel_classes
     }
 
     feasible_class_names = {item["class"] for item in feasible_vessels}
@@ -42,10 +42,10 @@ def _find_most_efficient_vessel(
     best_excess = float("inf")
 
     for class_name in feasible_class_names:
-        dwt = dwt_lookup.get(class_name)
-        if dwt is None:
+        capacity = capacity_lookup.get(class_name)
+        if capacity is None:
             continue
-        excess = dwt - cargo_tonnage  # guaranteed >= 0 by feasibility check
+        excess = capacity - cargo_tonnage  # guaranteed >= 0 by feasibility check
         if excess < best_excess:
             best_excess = excess
             best_class = class_name

@@ -1,5 +1,7 @@
 """
 Unit tests for the voyage cost estimation model.
+Assertions focus on structure, relationships, and invariants rather than exact
+mocked numbers, since data now comes from the real database.
 """
 
 import sys
@@ -12,57 +14,66 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from backend.member3.cost_model import estimate_voyage_cost
 
+
 class TestCostModel(unittest.TestCase):
+
     def test_australia_paradip_panamax(self):
-        """Case 1: Australia -> Paradip, Panamax, 50000t, waiting_days=2"""
+        """Case 1: Australia -> Paradip, Panamax, 50000t, waiting_days=2."""
         result = estimate_voyage_cost(
             cargo_tonnage=50000.0,
             origin="Australia",
             destination_port="Paradip",
             vessel_class="Panamax",
             freight_rate_usd_per_tonne=15.0,
-            waiting_days=2
+            waiting_days=2,
         )
-        
+
         total = result["total_usd"]
         breakdown = result["breakdown"]
-        
-        # Assert total equals sum of breakdown
-        self.assertEqual(total, breakdown["freight"] + breakdown["fuel"] + breakdown["port"] + breakdown["waiting"])
-        
-        # Assert non-negative
+
+        # Structural invariant: total == sum of breakdown
+        self.assertEqual(
+            total,
+            breakdown["freight"] + breakdown["fuel"] + breakdown["port"] + breakdown["waiting"],
+        )
+        # Sanity: all values positive
+        self.assertGreater(total, 0)
         for val in breakdown.values():
             self.assertGreaterEqual(val, 0)
-            
+
     def test_usa_paradip_capesize(self):
-        """Case 2: USA -> Paradip, Capesize, 150000t, waiting_days=0"""
+        """Case 2: USA -> Paradip, Capesize, 150000t, waiting_days=0."""
         result = estimate_voyage_cost(
             cargo_tonnage=150000.0,
             origin="USA",
             destination_port="Paradip",
             vessel_class="Capesize",
             freight_rate_usd_per_tonne=22.0,
-            waiting_days=0
+            waiting_days=0,
         )
-        
+
         total = result["total_usd"]
         breakdown = result["breakdown"]
-        
-        # Assert total equals sum of breakdown
-        self.assertEqual(total, breakdown["freight"] + breakdown["fuel"] + breakdown["port"] + breakdown["waiting"])
-        
-        # Assert non-negative
+
+        self.assertEqual(
+            total,
+            breakdown["freight"] + breakdown["fuel"] + breakdown["port"] + breakdown["waiting"],
+        )
+        self.assertGreater(total, 0)
         for val in breakdown.values():
             self.assertGreaterEqual(val, 0)
+
+        # With waiting_days=0 and no per-vessel daily hire in schema, waiting must be 0
+        self.assertEqual(breakdown["waiting"], 0)
 
     def test_invalid_lookups(self):
         """Ensure ValueErrors are raised for invalid inputs."""
         with self.assertRaises(ValueError):
             estimate_voyage_cost(10000, "UnknownOrigin", "Paradip", "Panamax", 10.0)
-        
+
         with self.assertRaises(ValueError):
             estimate_voyage_cost(10000, "Australia", "UnknownPort", "Panamax", 10.0)
-            
+
         with self.assertRaises(ValueError):
             estimate_voyage_cost(10000, "Australia", "Paradip", "UnknownClass", 10.0)
 
@@ -75,7 +86,7 @@ class TestCostModel(unittest.TestCase):
             vessel_class="Panamax",
             freight_rate_usd_per_tonne=15.0,
             waiting_days=2,
-            num_voyages=1
+            num_voyages=1,
         )
         scaled_result = estimate_voyage_cost(
             cargo_tonnage=50000.0,
@@ -84,7 +95,7 @@ class TestCostModel(unittest.TestCase):
             vessel_class="Panamax",
             freight_rate_usd_per_tonne=15.0,
             waiting_days=2,
-            num_voyages=3
+            num_voyages=3,
         )
         self.assertEqual(scaled_result["total_usd"], base_result["total_usd"] * 3)
         for key, val in base_result["breakdown"].items():
@@ -99,7 +110,7 @@ class TestCostModel(unittest.TestCase):
                 destination_port="Paradip",
                 vessel_class="Panamax",
                 freight_rate_usd_per_tonne=15.0,
-                num_voyages=0
+                num_voyages=0,
             )
 
     def test_invalid_cargo_tonnage(self):
@@ -110,8 +121,9 @@ class TestCostModel(unittest.TestCase):
                 origin="Australia",
                 destination_port="Paradip",
                 vessel_class="Panamax",
-                freight_rate_usd_per_tonne=15.0
+                freight_rate_usd_per_tonne=15.0,
             )
+
 
 if __name__ == "__main__":
     unittest.main()
